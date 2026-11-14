@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayFlow Warehouse · Payments analytics</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1024; --surface: #111831; --raised: #172040; --line: #232c4d;
+    --text: #e8ecf8; --muted: #9aa5c4; --faint: #6b7697;
+    --s1: #3987e5; --s2: #d95926;
+    --good: #3fb37f; --warn: #e0a83a; --bad: #e5604d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; }
+  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 40px 0 4px; }
+  h3 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+  p { margin: 0; }
+  .sub { color: var(--muted); }
+  .small { font-size: 12px; color: var(--muted); }
+  .notice { margin-top: 14px; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--warn);
+            border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 13px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 22px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; color: var(--muted); border: 0; padding: 7px 16px; font: inherit; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); font-weight: 600; }
+  .seg button:focus-visible, a:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .grid { display: grid; gap: 14px; margin-top: 14px; }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .tile .label { color: var(--muted); font-size: 12px; }
+  .tile .value { font-size: 22px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .delta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 6px 0 4px; }
+  .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; border-radius: 1px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .tip { position: absolute; pointer-events: none; background: #050816; border: 1px solid var(--line); border-radius: 6px;
+         padding: 6px 9px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); display: none; z-index: 2; }
+  .tip b { font-weight: 600; }
+  .tip span { color: var(--muted); }
+  .rows { display: grid; gap: 9px; margin-top: 10px; }
+  .row { display: grid; grid-template-columns: minmax(110px, 34%) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+  .row .track { height: 10px; background: var(--raised); border-radius: 0 4px 4px 0; }
+  .row .fill { height: 10px; background: var(--s1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .row .num { font-variant-numeric: tabular-nums; color: var(--text); text-align: right; min-width: 92px; }
+  .row .num span { color: var(--muted); margin-left: 6px; }
+  .scroll { overflow-x: auto; }
+  #merchants { min-width: 820px; } #monthly { min-width: 430px; } #checks, #rejects, #changes { min-width: 330px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; }
+  th.r { padding-right: 10px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+  .PASS { color: var(--good); } .WARN { color: var(--warn); } .FAIL { color: var(--bad); }
+  code { font: 12px ui-monospace, Consolas, monospace; color: var(--muted); }
+  footer { margin-top: 40px; color: var(--faint); font-size: 12px; }
+  a { color: var(--s1); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>PayFlow Warehouse</h1>
+    <p class="sub">Payments analytics from a dimensional warehouse, loaded by a daily batch pipeline.</p>
+    <p class="notice"><b>Synthetic data.</b> Every merchant, payment and amount on this page was produced by a seeded simulator. Nothing here describes a real business.</p>
+  </header>
+
+  <div class="bar">
+    <p class="small" id="range"></p>
+    <div class="seg" id="currency" role="group" aria-label="Currency"></div>
+  </div>
+
+  <section class="grid tiles" id="kpis" aria-label="Key figures"></section>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Captured volume per day</h3>
+      <p class="small">By authorization date. The 7-day average smooths the weekly cycle.</p>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Daily</span><span><i style="background:var(--s2)"></i>7-day average</span></div>
+      <div class="chart" id="volume"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h3>Approval rate, 7-day</h3>
+      <p class="small">Approved authorizations as a share of attempts.</p>
+      <div class="chart" id="approval" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h3>Month by month</h3>
+      <div class="scroll"><table id="monthly"></table></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Merchants by captured volume</h3>
+      <p class="small">Rank and share within the selected currency, with current merchant attributes.</p>
+      <div class="scroll"><table id="merchants"></table></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h3>Why payments are declined</h3><div class="rows" id="declines"></div></div>
+    <div class="card"><h3>Days from capture to settlement</h3><p class="small" id="unsettled"></p><div class="rows" id="lag"></div></div>
+    <div class="card"><h3>Card brand mix</h3><p class="small">Share of captured volume, with approval rate.</p><div class="rows" id="brands"></div></div>
+  </section>
+
+  <h2>Pipeline and data quality</h2>
+  <p class="sub">Every figure above passed through these controls. This section covers all currencies.</p>
+
+  <section class="grid tiles" id="pipeline" aria-label="Pipeline figures"></section>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Rows delivered per daily run</h3>
+      <p class="small" id="accounting"></p>
+      <div class="chart" id="runs" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h3>Quality checks, latest run</h3>
+      <p class="small" id="checksummary"></p>
+      <div class="scroll"><table id="checks"></table></div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Quarantined rows by reason</h3>
+        <p class="small">Rejected rows are stored with their reason, never dropped.</p>
+        <div class="scroll"><table id="rejects"></table></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Merchant history kept by the type 2 dimension</h3>
+        <p class="small">Each change opened a new version; payments keep the version in force when they were authorized.</p>
+        <div class="scroll"><table id="changes"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>
+const DATA = /*__DASHBOARD_DATA__*/null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const int = (n) => Number(n).toLocaleString("en-US");
+const pct = (n, d = 1) => (n == null ? "–" : Number(n).toFixed(d) + "%");
+const money = (n, cur, digits = 0) => n == null ? "–" :
+  new Intl.NumberFormat("en-US", { style: "currency", currency: cur, currencyDisplay: "code", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+const compact = (n) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+const day = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const longDay = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const sum = (rows, key) => rows.reduce((t, r) => t + (r[key] || 0), 0);
+const label = (s) => String(s).toLowerCase().replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+/* Line chart with a crosshair and tooltip. series: [{name, color, values, width, opacity}] */
+function lineChart(host, dates, series, opts) {
+  const W = Math.max(280, host.clientWidth || 1000), H = opts.height || 260, m = { l: 52, r: 12, t: 10, b: 26 };
+  const all = series.flatMap((s) => s.values).filter((v) => v != null);
+  let lo = opts.min ?? 0, hi = opts.max ?? Math.max(...all, 1);
+  if (opts.fit) { lo = Math.floor(Math.min(...all) - 1); hi = Math.ceil(Math.max(...all) + 1); }
+  const x = (i) => m.l + (i * (W - m.l - m.r)) / Math.max(1, dates.length - 1);
+  const y = (v) => H - m.b - ((v - lo) * (H - m.t - m.b)) / (hi - lo || 1);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => lo + t * (hi - lo));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label)}">`;
+  for (const t of ticks) {
+    svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="#232c4d" stroke-width="1"/>`;
+    svg += `<text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="#9aa5c4">${esc(opts.tick(t))}</text>`;
+  }
+  const step = Math.ceil(dates.length / Math.max(3, Math.floor(W / 120)));
+  dates.forEach((d, i) => {
+    if (i % step === 0) svg += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#9aa5c4">${day(d)}</text>`;
+  });
+  for (const s of series) {
+    const path = s.values.map((v, i) => (v == null ? "" : `${i && s.values[i - 1] != null ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`)).join("");
+    svg += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-opacity="${s.opacity || 1}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  svg += `<line class="cross" y1="${m.t}" y2="${H - m.b}" stroke="#9aa5c4" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  svg += series.map((s) => `<circle class="dot" r="4" fill="${s.color}" stroke="#111831" stroke-width="2" visibility="hidden"/>`).join("");
+  svg += `<rect class="hit" x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"/></svg><div class="tip"></div>`;
+  host.innerHTML = svg;
+  const el = host.querySelector("svg"), tip = host.querySelector(".tip"), cross = host.querySelector(".cross"), dots = host.querySelectorAll(".dot");
+  const hide = () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); dots.forEach((d) => d.setAttribute("visibility", "hidden")); };
+  const move = (ev) => {
+    const box = el.getBoundingClientRect();
+    const px = ((ev.clientX - box.left) / box.width) * W;
+    const i = Math.max(0, Math.min(dates.length - 1, Math.round(((px - m.l) / (W - m.l - m.r)) * (dates.length - 1))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+    let top = H;
+    series.forEach((s, k) => {
+      const v = s.values[i];
+      if (v == null) { dots[k].setAttribute("visibility", "hidden"); return; }
+      dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); dots[k].setAttribute("visibility", "visible");
+      top = Math.min(top, y(v));
+    });
+    tip.innerHTML = `<span>${longDay(dates[i])}</span>` + series.map((s) => `<br><span>${esc(s.name)}</span> <b>${s.values[i] == null ? "–" : esc(opts.value(s.values[i]))}</b>`).join("");
+    tip.style.display = "block";
+    const left = Math.max(70, Math.min(box.width - 70, (x(i) / W) * box.width));
+    tip.style.left = left + "px"; tip.style.top = Math.max(40, (top / H) * box.height - 10) + "px";
+  };
+  el.querySelector(".hit").addEventListener("pointermove", move);
+  el.querySelector(".hit").addEventListener("pointerdown", move);
+  el.addEventListener("pointerleave", hide);
+}
+
+function barRows(host, items) {
+  const top = Math.max(...items.map((i) => i.value), 1);
+  host.innerHTML = items.map((i) => `
+    <div class="row" title="${esc(i.name)}: ${esc(i.text)}${i.note ? " · " + esc(i.note) : ""}">
+      <div>${esc(i.name)}</div>
+      <div class="track"><div class="fill" style="width:${((100 * i.value) / top).toFixed(1)}%"></div></div>
+      <div class="num">${esc(i.text)}${i.note ? `<span>${esc(i.note)}</span>` : ""}</div>
+    </div>`).join("") || `<p class="small">No data.</p>`;
+}
+
+function tile(labelText, value, delta) {
+  return `<div class="card tile"><div class="label">${esc(labelText)}</div><div class="value">${esc(value)}</div><div class="delta">${delta || "&nbsp;"}</div></div>`;
+}
+
+function change(now, before, unit) {
+  if (before == null || !isFinite(before) || before === 0) return "";
+  const diff = unit === "pt" ? now - before : (100 * (now - before)) / before;
+  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+  return `${sign}${Math.abs(diff).toFixed(1)}${unit === "pt" ? " pt" : "%"} vs prior 30 days`;
+}
+
+function renderCurrency(cur) {
+  const daily = DATA.daily[cur] || [];
+  const last = daily.slice(-30), prior = daily.slice(-60, -30);
+  const stats = (rows) => {
+    const captured = sum(rows, "captured"), attempts = sum(rows, "attempts"), count = sum(rows, "captured_count");
+    return { captured, approval: attempts ? (100 * sum(rows, "approved")) / attempts : null,
+             refund: captured ? (100 * sum(rows, "refunded")) / captured : null,
+             ticket: count ? captured / count : null, bps: captured ? (10000 * sum(rows, "fees")) / captured : null };
+  };
+  const a = stats(last), b = prior.length === 30 ? stats(prior) : {};
+  $("kpis").innerHTML =
+    tile("Captured volume, last 30 days", money(a.captured, cur), change(a.captured, b.captured)) +
+    tile("Approval rate", pct(a.approval), change(a.approval, b.approval, "pt")) +
+    tile("Average ticket", money(a.ticket, cur, 2), change(a.ticket, b.ticket)) +
+    tile("Refunded share of volume", pct(a.refund, 2), change(a.refund, b.refund, "pt")) +
+    tile("Effective fee", a.bps == null ? "–" : a.bps.toFixed(0) + " bps", change(a.bps, b.bps));
+
+  const dates = daily.map((r) => r.d);
+  lineChart($("volume"), dates, [
+    { name: "Daily", color: "#3987e5", values: daily.map((r) => r.captured), width: 1.5, opacity: 0.75 },
+    { name: "7-day average", color: "#d95926", values: daily.map((r, i) => (i < 6 ? null : r.captured_7d)), width: 2 },
+  ], { label: `Captured volume per day in ${cur}`, tick: compact, value: (v) => money(v, cur) });
+  lineChart($("approval"), dates, [
+    { name: "Approval rate, 7-day", color: "#3987e5", values: daily.map((r, i) => (i < 6 ? null : r.approval_7d)), width: 2 },
+  ], { label: `Seven day approval rate in ${cur}`, fit: true, height: 220, tick: (v) => v.toFixed(0) + "%", value: (v) => pct(v, 2) });
+
+  $("monthly").innerHTML = `<tr><th>Month</th><th class="r">Captured</th><th class="r">Growth</th><th class="r">Approval</th><th class="r">Fee</th><th class="r">Refunds</th></tr>` +
+    (DATA.monthly[cur] || []).map((r) => `<tr><td>${new Date(r.month_start + "T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</td>
+      <td class="r">${money(r.captured_amount, cur)}</td><td class="r">${r.captured_growth_pct == null ? "–" : (r.captured_growth_pct > 0 ? "+" : "") + r.captured_growth_pct.toFixed(1) + "%"}</td>
+      <td class="r">${pct(r.approval_rate_pct)}</td><td class="r">${r.effective_fee_bps.toFixed(0)} bps</td><td class="r">${pct(r.refund_rate_pct, 2)}</td></tr>`).join("");
+
+  $("merchants").innerHTML = `<tr><th>#</th><th>Merchant</th><th>Category</th><th>Fee plan</th><th class="r">Captured</th><th style="min-width:120px">Share</th><th class="r">Approval</th><th class="r">Avg ticket</th><th class="r">Fee</th><th class="r">Refunds</th></tr>` +
+    (DATA.merchants[cur] || []).map((r) => `<tr><td>${r.volume_rank}</td><td>${esc(r.merchant_name)}${r.merchant_status !== "ACTIVE" ? ` <span class="pill WARN">${esc(label(r.merchant_status))}</span>` : ""}<div class="small">${esc(r.city)}</div></td>
+      <td>${esc(r.category)}</td><td>${esc(label(r.fee_plan_code))}</td><td class="r">${money(r.captured_amount, cur)}</td>
+      <td><div class="row" style="grid-template-columns:1fr auto"><div class="track"><div class="fill" style="width:${r.share_of_currency_pct}%"></div></div><div class="num" style="min-width:48px">${pct(r.share_of_currency_pct)}</div></div></td>
+      <td class="r">${pct(r.approval_rate_pct)}</td><td class="r">${money(r.avg_ticket, cur, 2)}</td><td class="r">${r.effective_fee_bps.toFixed(0)} bps</td><td class="r">${pct(r.refund_rate_pct, 2)}</td></tr>`).join("");
+
+  barRows($("declines"), (DATA.declines[cur] || []).map((r) => ({ name: label(r.decline_reason), value: r.declines, text: int(r.declines), note: pct(r.share_of_declines_pct) })));
+  const lag = DATA.lag[cur] || [], lagTotal = sum(lag, "payments");
+  barRows($("lag"), lag.map((r) => ({ name: r.lag_days === 1 ? "1 day" : r.lag_days + " days", value: r.payments, text: int(r.payments), note: pct((100 * r.payments) / lagTotal) })));
+  const waiting = (DATA.unsettled[cur] || [])[0];
+  $("unsettled").textContent = waiting ? `${int(waiting.payments)} captured payments (${money(waiting.amount, cur)}) are waiting for settlement; the oldest is ${waiting.oldest_days} day(s) old.` : "Nothing is waiting for settlement.";
+  barRows($("brands"), (DATA.brands[cur] || []).map((r) => ({ name: label(r.card_brand), value: r.share_of_currency_pct, text: pct(r.share_of_currency_pct), note: pct(r.approval_rate_pct) + " approved" })));
+}
+
+function renderPipeline() {
+  const t = DATA.totals;
+  $("range").textContent = `Data from ${longDay(t.first_date)} to ${longDay(t.last_date)} · ${int(t.payments)} payments · ${t.merchants} merchants`;
+  $("pipeline").innerHTML =
+    tile("Daily runs succeeded", `${t.runs_succeeded} of ${t.runs_succeeded + t.runs_failed}`, "one run per business date") +
+    tile("Rows delivered", int(t.rows_delivered), "across four files per day") +
+    tile("Rows loaded", int(t.rows_loaded), pct((100 * t.rows_loaded) / t.rows_delivered, 2) + " of delivered") +
+    tile("Rows quarantined", int(t.rows_rejected), "kept with a reason code") +
+    tile("Duplicates dropped", int(t.rows_duplicate), "re-sent or superseded rows") +
+    tile("Late-arriving payments", int(t.late_payments), "delivered 1 to 3 days late");
+  const balanced = t.rows_delivered === t.rows_loaded + t.rows_rejected + t.rows_duplicate;
+  $("accounting").textContent = `${int(t.rows_delivered)} delivered = ${int(t.rows_loaded)} loaded + ${int(t.rows_rejected)} quarantined + ${int(t.rows_duplicate)} duplicates. ${balanced ? "Every row is accounted for." : "The totals do not balance."}`;
+  lineChart($("runs"), DATA.runs.map((r) => r.d), [{ name: "Rows delivered", color: "#3987e5", values: DATA.runs.map((r) => r.raw_rows), width: 2 }],
+    { label: "Rows delivered per daily run", height: 200, tick: int, value: int });
+
+  const passed = DATA.checks.filter((c) => c.status === "PASS").length;
+  const history = DATA.warning_history.map((w) => `${label(w.check_name)} warned on ${w.runs} run(s), ${day(w.first_date)} to ${day(w.last_date)}`).join("; ");
+  $("checksummary").textContent = `${passed} of ${DATA.checks.length} checks passed.` + (history ? ` Earlier runs: ${history}.` : "");
+  $("checks").innerHTML = `<tr><th>Check</th><th>Result</th><th class="r">Violations</th></tr>` +
+    DATA.checks.map((c) => `<tr><td>${esc(c.description)}<div><code>${esc(c.check_name)}</code></div></td><td><span class="pill ${c.status}">${c.status === "PASS" ? "✓ Pass" : c.status === "WARN" ? "! Warn" : "✕ Fail"}</span></td><td class="r">${int(c.violations)}</td></tr>`).join("");
+  $("rejects").innerHTML = `<tr><th>File</th><th>Reason</th><th class="r">Rows</th></tr>` +
+    DATA.rejects.map((r) => `<tr><td>${esc(r.file_name)}</td><td>${esc(label(r.reason))}</td><td class="r">${int(r.row_count)}</td></tr>`).join("");
+  $("changes").innerHTML = `<tr><th>From</th><th>Merchant</th><th>Changed</th><th>New value</th></tr>` +
+    DATA.merchant_changes.map((r) => {
+      const value = { "category": r.category, "city": r.city, "fee plan": label(r.fee_plan_code), "status": label(r.status) }[r.changed_attributes] || "";
+      return `<tr><td style="white-space:nowrap">${day(r.valid_from)}</td><td>${esc(r.merchant_name)}</td><td>${esc(label(r.changed_attributes))}</td><td>${esc(value)}</td></tr>`;
+    }).join("");
+  $("footer").textContent = `Built ${DATA.generated_at} from the mart views of the warehouse. Amounts are never summed across currencies.`;
+}
+
+function start() {
+  const host = $("currency");
+  host.innerHTML = DATA.currencies.map((c) => `<button type="button" data-cur="${c}" aria-pressed="false">${c}</button>`).join("");
+  const select = (cur) => {
+    host.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cur === cur)));
+    renderCurrency(cur);
+  };
+  let current = DATA.currencies[0], width = window.innerWidth, timer;
+  const selectAndKeep = (cur) => { current = cur; select(cur); };
+  host.addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) selectAndKeep(b.dataset.cur); });
+  /* Charts are drawn at the pixel width of their container, so redraw when it changes. */
+  window.addEventListener("resize", () => {
+    if (window.innerWidth === width) return;
+    width = window.innerWidth; clearTimeout(timer);
+    timer = setTimeout(() => { renderPipeline(); select(current); }, 150);
+  });
+  renderPipeline();
+  select(current);
+}
+if (DATA) start(); else document.querySelector("main").insertAdjacentHTML("beforeend", "<p class='notice'>No data embedded. Build this page with <code>pfw dashboard</code>.</p>");
+</script>
+</body>
+</html>

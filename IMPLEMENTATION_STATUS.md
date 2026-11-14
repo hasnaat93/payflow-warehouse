@@ -22,7 +22,7 @@ Figures from that demo run (they are deterministic for seed 7):
 
 ## Continuous integration
 
-See the Actions tab of the repository for the current result. The workflow runs lint, tests and the full `pfw demo` on Python 3.11 and 3.13 on Linux, then publishes the dashboard to GitHub Pages.
+The workflow runs lint, tests and the full `pfw demo` on Python 3.11 and 3.13 on Linux, then publishes the dashboard to GitHub Pages. The first run (2026-11-14) passed on both versions, and the published page at https://hasnaat93.github.io/payflow-warehouse/ returned the dashboard with 92 successful runs. See the Actions tab for the current result.
 
 ## Not verified
 

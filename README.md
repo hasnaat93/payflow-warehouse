@@ -6,6 +6,8 @@ Python · SQL · DuckDB · star schema · slowly changing dimensions · data qua
 
 > **Everything here is synthetic.** The source data comes from a seeded simulator. No merchant, payment or amount describes a real business, and no real card data is involved anywhere.
 
+**[Live dashboard](https://hasnaat93.github.io/payflow-warehouse/)** — rebuilt by CI from a fresh pipeline run on every push.
+
 The analytics companion to [PayFlow Lab](https://github.com/hasnaat93/payflow-lab), which simulates the payment operations side. This project is standalone: it needs only Python.
 
 ![Dashboard: captured volume and KPIs](docs/screenshots/dashboard-analytics.png)
